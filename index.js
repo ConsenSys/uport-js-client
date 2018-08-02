@@ -20,7 +20,7 @@ const IPFS = require('ipfs-api')
 const isIPFS = require('is-ipfs')
 const EthSigner = require('eth-signer')
 const SimpleSigner = EthSigner.signers.SimpleSigner
-const IMProxySigner = EthSigner.signers.IMProxySigner
+const MIMProxySigner = EthSigner.signers.MIMProxySigner
 const urlDecode = require('urldecode')
 const fs = require('fs')
 const deploy = require('./deploy.js')
@@ -36,7 +36,7 @@ const tryRequire = (path) => {
 
 const uportIdentity = require('uport-identity')
 const RegistryArtifact = require('uport-registry')
-const IdentityManagerArtifact = uportIdentity.IdentityManager.v1
+const MetaIdentityManagerArtifact = uportIdentity.MetaIdentityManager.v2
 
 // TODO need to import identity manager Adresses
 
@@ -130,7 +130,7 @@ const deserialize = (str) => {
   uportClient.mnid = jsonClientState.mnid
   uportClient.initTokenSigner()
   uportClient.initSimpleSigner()
-  uportClient.initTransactionSigner(uportClient.identityManagerAddress)
+  uportClient.initTransactionSigner(uportClient.metaIdentityManagerAddress)
   return uportClient
 }
 
@@ -231,10 +231,10 @@ class UPortClient {
 
       // TODO how to config this
       this.registryAddress = this.network.registry
-      this.identityManagerAddress = this.network.identityManager
+      this.metaIdentityManagerAddress = MetaIdentityManagerArtifact.networks[this.network.id].address
 
       this.initialized = config.initialized || false
-      
+
       this.consume = this.consume.bind(this); // Bind consume method to make it compatible with other uport libraries.
   }
 }
@@ -256,8 +256,8 @@ class UPortClient {
      this.transactionSigner = this.simpleSigner  //TODO Make less confusing, uses simpler signer until identity created then uses identity specific signer
   }
 
-  initTransactionSigner(IdentityManagerAdress) {
-     this.transactionSigner = new IMProxySigner(this.id, this.simpleSigner, IdentityManagerAdress)
+  initTransactionSigner(MetaIdentityManagerAdress) {
+     this.transactionSigner = new MIMProxySigner(this.id, this.simpleSigner, MetaIdentityManagerAdress)
   }
 
   appDDO(name, description, url, img) {
@@ -312,19 +312,19 @@ class UPortClient {
 
   initializeIdentity(initDdo){
     if (!this.network) return Promise.reject(new Error('No network configured'))
-    const IdentityManagerAdress = this.identityManagerAddress
-    const IdentityManager = Contract(IdentityManagerArtifact.abi).at(IdentityManagerAdress) // add config for this
+    const MetaIdentityManagerAdress = this.metaIdentityManagerAddress
+    const MetaIdentityManager = Contract(MetaIdentityManagerArtifact.abi).at(MetaIdentityManagerAdress) // add config for this
     this.initKeys()
-    const uri = IdentityManager.createIdentity(this.deviceKeys.address, this.recoveryKeys.address)
+    const uri = MetaIdentityManager.createIdentity(this.deviceKeys.address, this.recoveryKeys.address)
 
     return this.consume(uri)
             .then(this.getReceipt.bind(this))
             .then(receipt => {
               const log = receipt.logs[0]
-              const createEventAbi = IdentityManager.abi.filter(obj => obj.type === 'event' && obj.name ==='IdentityCreated')[0]
+              const createEventAbi = MetaIdentityManager.abi.filter(obj => obj.type === 'event' && obj.name ==='LogIdentityCreated')[0]
               this.id = decodeEvent(createEventAbi, log.data, log.topics).identity
               this.mnid = mnid.encode({ network: this.network.id, address: this.id })
-              this.initTransactionSigner(IdentityManagerAdress)
+              this.initTransactionSigner(MetaIdentityManagerAdress)
               // TODO add address?
               const baseDdo = {
                   '@context': 'http://schema.org',
