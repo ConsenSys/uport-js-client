@@ -231,7 +231,7 @@ class UPortClient {
 
       // TODO how to config this
       this.registryAddress = this.network.registry
-      this.metaIdentityManagerAddress = MetaIdentityManagerArtifact.networks[this.network.id].address
+      this.metaIdentityManagerAddress = MetaIdentityManagerArtifact.networks[this.network.id[2]].address
 
       this.initialized = config.initialized || false
 
